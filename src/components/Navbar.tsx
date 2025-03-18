@@ -64,56 +64,6 @@ const Navbar = () => {
           <Image src={siteConfig.icon} alt="icon" width="25" height="25" priority />
           <span className="hidden font-bold sm:block">{siteConfig.title}</span>
         </Link>
-
-        <div className="flex flex-1 items-center space-x-4 text-gray-700 md:flex-initial">
-          <button
-            className="flex flex-1 items-center justify-between rounded-lg bg-gray-100 px-2.5 py-1.5 hover:opacity-80 dark:bg-gray-800 dark:text-white md:w-48"
-            onClick={openSearchBox}
-          >
-            <div className="flex items-center space-x-2">
-              <FontAwesomeIcon className="h-4 w-4" icon="search" />
-              <span className="truncate text-sm font-medium">{'Search ...'}</span>
-            </div>
-
-            <div className="hidden items-center space-x-1 md:flex">
-              <div className="rounded-lg bg-gray-200 px-2 py-1 text-xs font-medium dark:bg-gray-700">
-                {os === 'mac' ? '⌘' : 'Ctrl'}
-              </div>
-              <div className="rounded-lg bg-gray-200 px-2 py-1 text-xs font-medium dark:bg-gray-700">K</div>
-            </div>
-          </button>
-
-          {siteConfig.links.length !== 0 &&
-            siteConfig.links.map((l: { name: string; link: string }) => (
-              <a
-                key={l.name}
-                href={l.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center space-x-2 hover:opacity-80 dark:text-white"
-              >
-                <FontAwesomeIcon icon={['fab', l.name.toLowerCase() as IconName]} />
-                <span className="hidden text-sm font-medium md:inline-block">{l.name}</span>
-              </a>
-            ))}
-
-          {siteConfig.email && (
-            <a href={siteConfig.email} className="flex items-center space-x-2 hover:opacity-80 dark:text-white">
-              <FontAwesomeIcon icon={['far', 'envelope']} />
-              <span className="hidden text-sm font-medium md:inline-block">{'Email'}</span>
-            </a>
-          )}
-
-          {tokenPresent && (
-            <button
-              className="flex items-center space-x-2 hover:opacity-80 dark:text-white"
-              onClick={() => setIsOpen(true)}
-            >
-              <span className="hidden text-sm font-medium md:inline-block">{'Logout'}</span>
-              <FontAwesomeIcon icon="sign-out-alt" />
-            </button>
-          )}
-        </div>
       </div>
 
       <Transition appear show={isOpen} as={Fragment}>
