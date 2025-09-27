@@ -65,6 +65,26 @@ const VideoPlayer: FC<{
   const plyrOptions: Plyr.Options = {
     ratio: `${width ?? 16}:${height ?? 9}`,
     fullscreen: { iosNative: true },
+    // -------------------------------------------------------------
+    // MODIFICATION START: Add controls array with 'fast-forward'
+    // -------------------------------------------------------------
+    controls: [
+      'restart',
+      'rewind',       // Rewind button (typically skips back 10 seconds)
+      'play',
+      'fast-forward', // Fast Forward button (typically skips forward 10 seconds)
+      'progress',
+      'current-time',
+      'duration',
+      'mute',
+      'volume',
+      'captions',
+      'settings',
+      'fullscreen',
+    ],
+    // -------------------------------------------------------------
+    // MODIFICATION END
+    // -------------------------------------------------------------
   }
   if (!isFlv) {
     // If the video is not in flv format, we can use the native plyr and add sources directly with the video URL
