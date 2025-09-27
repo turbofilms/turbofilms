@@ -1,6 +1,6 @@
 import type { OdFileObject } from '../../types'
 
-import { FC, useEffect, useState } from 'react'
+import { FC, useEffect, useState, useRef } from 'react' // 👈 ADDED useRef
 import { useRouter } from 'next/router'
 
 import axios from 'axios'
@@ -21,6 +21,9 @@ import CustomEmbedLinkMenu from '../CustomEmbedLinkMenu'
 
 import 'plyr-react/plyr.css'
 
+// Define the type for the Plyr ref to access its API
+type PlyrInstance = { plyr: { currentTime: number } }
+
 const VideoPlayer: FC<{
   videoName: string
   videoUrl: string
@@ -31,6 +34,20 @@ const VideoPlayer: FC<{
   isFlv: boolean
   mpegts: any
 }> = ({ videoName, videoUrl, width, height, thumbnail, subtitle, isFlv, mpegts }) => {
+  // -------------------------------------------------------------
+  // MODIFICATION: Setup ref for Plyr and skip logic
+  // -------------------------------------------------------------
+  const playerRef = useRef<PlyrInstance | null>(null) // Ref to access the underlying Plyr instance
+
+  const handleSkip = (seconds: number) => {
+    if (playerRef.current && playerRef.current.plyr) {
+      playerRef.current.plyr.currentTime += seconds
+    }
+  }
+  // -------------------------------------------------------------
+  // END MODIFICATION
+  // -------------------------------------------------------------
+
   useEffect(() => {
     // Really really hacky way to inject subtitles as file blobs into the video element
     axios
@@ -66,31 +83,61 @@ const VideoPlayer: FC<{
     ratio: `${width ?? 16}:${height ?? 9}`,
     fullscreen: { iosNative: true },
     // -------------------------------------------------------------
-    // MODIFICATION START: Add controls array with 'fast-forward'
+    // MODIFICATION: Add 'fast-forward' and 'rewind' to the control bar
     // -------------------------------------------------------------
     controls: [
-      'restart',
-      'rewind',       // Rewind button (typically skips back 10 seconds)
+      //'play-large',   // Large center play button
+      //'restart',
+      'rewind',       // Control bar skip backward
       'play',
-      'fast-forward', // Fast Forward button (typically skips forward 10 seconds)
+      'fast-forward', // Control bar skip forward
       'progress',
       'current-time',
       'duration',
       'mute',
       'volume',
       'captions',
-      'settings',
+      'settings',     // Automatically includes Audio Track control if available
+      //'pip',          // Picture-in-Picture
       'fullscreen',
     ],
     // -------------------------------------------------------------
-    // MODIFICATION END
+    // END MODIFICATION
     // -------------------------------------------------------------
   }
   if (!isFlv) {
     // If the video is not in flv format, we can use the native plyr and add sources directly with the video URL
     plyrSource['sources'] = [{ src: videoUrl }]
   }
-  return <Plyr id="plyr" source={plyrSource as Plyr.SourceInfo} options={plyrOptions} />
+
+  // -------------------------------------------------------------
+  // MODIFICATION: Wrap Plyr with Skip Overlays for on-screen skip
+  // -------------------------------------------------------------
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      {/* Skip Backward Overlay (Left Half) - Double-click/tap skips back 10s */}
+      <div
+        className="absolute top-0 left-0 w-1/2 h-full z-10 cursor-pointer"
+        onDoubleClick={() => handleSkip(-10)}
+        aria-label="Skip backward 10 seconds"
+        title="Double-click to skip backward 10 seconds"
+      />
+
+      {/* Skip Forward Overlay (Right Half) - Double-click/tap skips forward 10s */}
+      <div
+        className="absolute top-0 right-0 w-1/2 h-full z-10 cursor-pointer"
+        onDoubleClick={() => handleSkip(10)}
+        aria-label="Skip forward 10 seconds"
+        title="Double-click to skip forward 10 seconds"
+      />
+
+      {/* The Plyr player component, linked to playerRef */}
+      <Plyr ref={playerRef} id="plyr" source={plyrSource as Plyr.SourceInfo} options={plyrOptions} />
+    </div>
+  )
+  // -------------------------------------------------------------
+  // END MODIFICATION
+  // -------------------------------------------------------------
 }
 
 const VideoPreview: FC<{ file: OdFileObject }> = ({ file }) => {
@@ -159,39 +206,7 @@ const VideoPreview: FC<{ file: OdFileObject }> = ({ file }) => {
             btnColor="pink"
             btnText={'Copy direct link'}
             btnIcon="copy"
-          />
-          <DownloadButton
-            onClickCallback={() => setMenuOpen(true)}
-            btnColor="teal"
-            btnText={'Customise link'}
-            btnIcon="pen"
-          />
-
-          <DownloadButton
-            onClickCallback={() => window.open(`iina://weblink?url=${getBaseUrl()}${videoUrl}`)}
-            btnText="IINA"
-            btnImage="/players/iina.png"
-          />
-          <DownloadButton
-            onClickCallback={() => window.open(`vlc://${getBaseUrl()}${videoUrl}`)}
-            btnText="VLC"
-            btnImage="/players/vlc.png"
-          />
-          <DownloadButton
-            onClickCallback={() => window.open(`potplayer://${getBaseUrl()}${videoUrl}`)}
-            btnText="PotPlayer"
-            btnImage="/players/potplayer.png"
-          />
-          <DownloadButton
-            onClickCallback={() => window.open(`nplayer-http://${window?.location.hostname ?? ''}${videoUrl}`)}
-            btnText="nPlayer"
-            btnImage="/players/nplayer.png"
-          />
-          <DownloadButton
-            onClickCallback={() => window.open(`intent://${getBaseUrl()}${videoUrl}#Intent;type=video/any;package=is.xyz.mpv;scheme=https;end;`)}
-            btnText="mpv-android"
-            btnImage="/players/mpv-android.png"
-          />
+          />          
         </div>
       </DownloadBtnContainer>
     </>
