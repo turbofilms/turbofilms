@@ -1,11 +1,11 @@
 import type { OdFileObject } from '../../types'
 
-import { FC, useEffect, useState, useRef } from 'react'
+import { FC, useEffect, useState, useRef } from 'react' // 👈 ADDED useRef
 import { useRouter } from 'next/router'
 
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import Plyr, { APITypes } from 'plyr-react' // 👈 CORRECTED: Import APITypes for the Ref type
+import Plyr, { APITypes } from 'plyr-react' // 👈 ADDED APITypes for the ref type
 import { useAsync } from 'react-async-hook'
 import { useClipboard } from 'use-clipboard-copy'
 
@@ -21,10 +21,8 @@ import CustomEmbedLinkMenu from '../CustomEmbedLinkMenu'
 
 import 'plyr-react/plyr.css'
 
-// --------------------------------------------------------------------------
-// NOTE: Deleted the problematic custom type definition: type PlyrInstance = { plyr: { currentTime: number } }
-// APITypes is imported directly from 'plyr-react' and is used below.
-// --------------------------------------------------------------------------
+// NOTE: We no longer need the custom type definition 'type PlyrInstance = { plyr: { currentTime: number } }'
+// because we are using APITypes from 'plyr-react'.
 
 const VideoPlayer: FC<{
   videoName: string
@@ -37,19 +35,18 @@ const VideoPlayer: FC<{
   mpegts: any
 }> = ({ videoName, videoUrl, width, height, thumbnail, subtitle, isFlv, mpegts }) => {
   // -------------------------------------------------------------
-  // MODIFICATION: Setup ref for Plyr and skip logic
+  // MODIFICATION 1: Setup ref for Plyr and skip logic
   // -------------------------------------------------------------
-  // Use the correct type APITypes for the ref
-  const playerRef = useRef<APITypes | null>(null) 
+  const playerRef = useRef<APITypes | null>(null) // Use APITypes for the ref
 
   const handleSkip = (seconds: number) => {
     if (playerRef.current && playerRef.current.plyr) {
-      // Cast playerRef.current.plyr to the Plyr instance type for clean access
+      // Cast the plyr property to the Plyr instance to access its methods
       (playerRef.current.plyr as Plyr).currentTime += seconds
     }
   }
   // -------------------------------------------------------------
-  // END MODIFICATION
+  // END MODIFICATION 1
   // -------------------------------------------------------------
 
   useEffect(() => {
@@ -87,11 +84,11 @@ const VideoPlayer: FC<{
     ratio: `${width ?? 16}:${height ?? 9}`,
     fullscreen: { iosNative: true },
     // -------------------------------------------------------------
-    // MODIFICATION: Control bar buttons (rewind, play, fast-forward)
+    // MODIFICATION 2: Add all necessary controls
     // -------------------------------------------------------------
     controls: [
-      //'play-large',   // Large center play button (re-enabled for completeness)
-      //'restart',      // Re-enabled for completeness
+      //'play-large',   // Large center play button
+      //'restart',
       'rewind',       // Control bar skip backward
       'play',
       'fast-forward', // Control bar skip forward
@@ -101,12 +98,12 @@ const VideoPlayer: FC<{
       'mute',
       'volume',
       'captions',
-      'settings',     // Automatically includes Audio Track control if available
-      //'pip',          // Picture-in-Picture (re-enabled for completeness)
+      'settings',
+      //'pip',          // Picture-in-Picture
       //'fullscreen',
     ],
     // -------------------------------------------------------------
-    // END MODIFICATION
+    // END MODIFICATION 2
     // -------------------------------------------------------------
   }
   if (!isFlv) {
@@ -115,7 +112,7 @@ const VideoPlayer: FC<{
   }
 
   // -------------------------------------------------------------
-  // MODIFICATION: Wrap Plyr with Skip Overlays for on-screen skip
+  // MODIFICATION 3: Wrap Plyr with Skip Overlays for on-screen skip
   // -------------------------------------------------------------
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -140,7 +137,7 @@ const VideoPlayer: FC<{
     </div>
   )
   // -------------------------------------------------------------
-  // END MODIFICATION
+  // END MODIFICATION 3
   // -------------------------------------------------------------
 }
 
