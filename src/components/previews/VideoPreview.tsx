@@ -1,13 +1,16 @@
 import type { OdFileObject } from '../../types'
 
-import { FC, useEffect, useState } from 'react'
+import { FC, useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/router'
 
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import Plyr from 'plyr-react'
 import { useAsync } from 'react-async-hook'
 import { useClipboard } from 'use-clipboard-copy'
+
+// ⚠️ New Imports for Video.js wrapper
+import { Player, ControlBar, BigPlayButton, PlaybackRateMenuButton, VolumeMenuButton } from 'video-react'
+import 'video-react/dist/video-react.css' // Import CSS for the new player
 
 import { getBaseUrl } from '../../utils/getBaseUrl'
 import { getExtension } from '../../utils/getFileIcon'
@@ -19,7 +22,9 @@ import FourOhFour from '../FourOhFour'
 import Loading from '../Loading'
 import CustomEmbedLinkMenu from '../CustomEmbedLinkMenu'
 
-import 'plyr-react/plyr.css'
+// -------------------------------------------------------------
+// MODIFICATION START: Replaced Plyr with Video.js (video-react)
+// -------------------------------------------------------------
 
 const VideoPlayer: FC<{
   videoName: string
@@ -31,68 +36,90 @@ const VideoPlayer: FC<{
   isFlv: boolean
   mpegts: any
 }> = ({ videoName, videoUrl, width, height, thumbnail, subtitle, isFlv, mpegts }) => {
+  // 1. Use a Ref to access the underlying player instance/DOM node
+  const playerRef = useRef<Player>(null)
+
   useEffect(() => {
-    // Really really hacky way to inject subtitles as file blobs into the video element
-    axios
-      .get(subtitle, { responseType: 'blob' })
-      .then(resp => {
-        const track = document.querySelector('track')
-        track?.setAttribute('src', URL.createObjectURL(resp.data))
-      })
-      .catch(() => {
-        console.log('Could not load subtitle.')
-      })
+    // Check if the player is ready and get the internal <video> element
+    const videoElement = playerRef.current?.video.video; 
 
-    if (isFlv) {
-      const loadFlv = () => {
-        // Really hacky way to get the exposed video element from Plyr
-        const video = document.getElementById('plyr')
-        const flv = mpegts.createPlayer({ url: videoUrl, type: 'flv' })
-        flv.attachMediaElement(video)
-        flv.load()
-      }
-      loadFlv()
+    // -----------------------------------------------------------------
+    // 2. Subtitle Injection Logic (Modified to use Ref and query the player's internal DOM)
+    // -----------------------------------------------------------------
+    if (videoElement) {
+        axios
+          .get(subtitle, { responseType: 'blob' })
+          .then(resp => {
+            // Query for the specific track element within the player's container
+            // video-react will render the <track> elements, we just update the src
+            const track = videoElement.querySelector('track');
+            if (track) {
+                track.setAttribute('src', URL.createObjectURL(resp.data));
+            }
+          })
+          .catch(() => {
+            console.log('Could not load subtitle.')
+          })
     }
-  }, [videoUrl, isFlv, mpegts, subtitle])
+    
+    // -----------------------------------------------------------------
+    // 3. FLV/mpegts.js Logic (Modified to use Ref instead of document.getElementById)
+    // -----------------------------------------------------------------
+    if (isFlv && mpegts && videoElement) {
+        const loadFlv = () => {
+            // Use the videoElement obtained from the Ref
+            const flv = mpegts.createPlayer({ url: videoUrl, type: 'flv' })
+            flv.attachMediaElement(videoElement)
+            flv.load()
+        }
+        loadFlv()
+    }
 
-  // Common plyr configs, including the video source and plyr options
-  const plyrSource = {
-    type: 'video',
-    title: videoName,
-    poster: thumbnail,
-    tracks: [{ kind: 'captions', label: videoName, src: '', default: true }],
-  }
-  const plyrOptions: Plyr.Options = {
-    ratio: `${width ?? 16}:${height ?? 9}`,
-    fullscreen: { iosNative: true },
-    // -------------------------------------------------------------
-    // MODIFICATION START: Add controls array with 'fast-forward'
-    // -------------------------------------------------------------
-    controls: [
-      'rewind',       // Rewind button (typically skips back 10 seconds)
-      'play',
-      'fast-forward', // Fast Forward button (typically skips forward 10 seconds)
-      'progress',
-      'current-time',
-      'duration',
-      'mute',
-      'volume',
-      'captions',
-      'settings',
-      'fullscreen',
-    ],
-    // -------------------------------------------------------------
-    // MODIFICATION END
-    // -------------------------------------------------------------
-  }
-  if (!isFlv) {
-    // If the video is not in flv format, we can use the native plyr and add sources directly with the video URL
-    plyrSource['sources'] = [{ src: videoUrl }]
-  }
-  return <Plyr id="plyr" source={plyrSource as Plyr.SourceInfo} options={plyrOptions} />
+  }, [videoUrl, isFlv, mpegts, subtitle])
+  
+  // Note: video-react handles aspect ratio better through CSS/container
+  const aspectRatio = `${width ?? 16}:${height ?? 9}`
+
+  // A basic HLS/DASH URL for testing multi-audio. 
+  // For actual multi-audio, videoUrl should point to an HLS/DASH manifest.
+  const sourceUrl = isFlv ? '' : videoUrl;
+
+  return (
+    // 'video-react' Player component replaces 'Plyr'
+    <Player
+      ref={playerRef} // Attach ref for custom logic
+      playsInline
+      poster={thumbnail}
+      src={sourceUrl}
+      fluid={true} // Use 100% width of the container
+      aspectRatio={aspectRatio}
+    >
+      {/* 4. Subtitle Track: It must be here for the useEffect to find it */}
+      <track kind="captions" label={videoName} src="" default={true} />
+
+      {/* 5. Custom Control Bar with Playback Rate/Volume/etc. */}
+      <BigPlayButton position="center" />
+      <ControlBar>
+        {/* Rewind/Fast-forward are not standard in video-react control bar, but it supports custom buttons.
+           Using PlaybackRateMenuButton for a similar control over speed. */}
+        <VolumeMenuButton vertical />
+        <PlaybackRateMenuButton rates={[2, 1.5, 1.25, 1, 0.75, 0.5]} />
+        {/* You can add custom buttons here for Audio Track Selection if using HLS/DASH, 
+            but it requires custom Video.js plugins or logic. */}
+      </ControlBar>
+      
+      {/* The actual <video> element is rendered inside this component */}
+    </Player>
+  )
 }
 
+// -------------------------------------------------------------
+// MODIFICATION END
+// -------------------------------------------------------------
+
 const VideoPreview: FC<{ file: OdFileObject }> = ({ file }) => {
+// ... (rest of the component remains the same)
+
   const { asPath } = useRouter()
   const hashedToken = getStoredToken(asPath)
   const clipboard = useClipboard()
@@ -116,6 +143,7 @@ const VideoPreview: FC<{ file: OdFileObject }> = ({ file }) => {
     result: mpegts,
   } = useAsync(async () => {
     if (isFlv) {
+      // mpegts.js import remains the same
       return (await import('mpegts.js')).default
     }
   }, [isFlv])
