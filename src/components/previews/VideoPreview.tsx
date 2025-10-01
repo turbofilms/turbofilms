@@ -1,16 +1,13 @@
 import type { OdFileObject } from '../../types'
 
-import { FC, useEffect, useState, useRef } from 'react'
+import { FC, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import Plyr from 'plyr-react'
 import { useAsync } from 'react-async-hook'
 import { useClipboard } from 'use-clipboard-copy'
-
-// ⚠️ NEW IMPORTS for Video.js wrapper (video-react)
-import { Player, ControlBar, BigPlayButton, PlaybackRateMenuButton, VolumeMenuButton } from 'video-react'
-import 'video-react/dist/video-react.css' // Import CSS for the new player
 
 import { getBaseUrl } from '../../utils/getBaseUrl'
 import { getExtension } from '../../utils/getFileIcon'
@@ -22,9 +19,7 @@ import FourOhFour from '../FourOhFour'
 import Loading from '../Loading'
 import CustomEmbedLinkMenu from '../CustomEmbedLinkMenu'
 
-// -------------------------------------------------------------
-// MODIFICATION START: Replaced Plyr with Video.js (video-react)
-// -------------------------------------------------------------
+import 'plyr-react/plyr.css'
 
 const VideoPlayer: FC<{
   videoName: string
@@ -36,86 +31,66 @@ const VideoPlayer: FC<{
   isFlv: boolean
   mpegts: any
 }> = ({ videoName, videoUrl, width, height, thumbnail, subtitle, isFlv, mpegts }) => {
-  // 1. Use a Ref to access the underlying player instance/DOM node
-  // FIX: Using 'any' to resolve TypeScript error for the component instance.
-  const playerRef = useRef<any>(null)
-
   useEffect(() => {
-    // Check if the player is ready and get the internal <video> element
-    // The underlying HTMLVideoElement is usually found at instance.video.video
-    const videoElement = playerRef.current?.video.video
+    // Really really hacky way to inject subtitles as file blobs into the video element
+    axios
+      .get(subtitle, { responseType: 'blob' })
+      .then(resp => {
+        const track = document.querySelector('track')
+        track?.setAttribute('src', URL.createObjectURL(resp.data))
+      })
+      .catch(() => {
+        console.log('Could not load subtitle.')
+      })
 
-    // -----------------------------------------------------------------
-    // 2. Subtitle Injection Logic (Modified to use Ref)
-    // -----------------------------------------------------------------
-    if (videoElement) {
-      axios
-        .get(subtitle, { responseType: 'blob' })
-        .then(resp => {
-          // Query for the specific track element within the underlying video element
-          const track = videoElement.querySelector('track')
-          if (track) {
-            track.setAttribute('src', URL.createObjectURL(resp.data))
-          }
-        })
-        .catch(() => {
-          console.log('Could not load subtitle.')
-        })
-    }
-
-    // -----------------------------------------------------------------
-    // 3. FLV/mpegts.js Logic (Modified to use Ref)
-    // -----------------------------------------------------------------
-    if (isFlv && mpegts && videoElement) {
+    if (isFlv) {
       const loadFlv = () => {
-        // Use the videoElement obtained from the Ref
+        // Really hacky way to get the exposed video element from Plyr
+        const video = document.getElementById('plyr')
         const flv = mpegts.createPlayer({ url: videoUrl, type: 'flv' })
-        flv.attachMediaElement(videoElement)
+        flv.attachMediaElement(video)
         flv.load()
       }
       loadFlv()
     }
   }, [videoUrl, isFlv, mpegts, subtitle])
 
-  // Note: video-react handles aspect ratio through a prop/CSS
-  const aspectRatio = `${width ?? 16}:${height ?? 9}`
-
-  // For FLV files, set the source to an empty string; mpegts.js handles injection.
-  const sourceUrl = isFlv ? '' : videoUrl
-
-  return (
-    // 'video-react' Player component replaces 'Plyr'
-    <Player
-      ref={playerRef} // Attach ref for custom logic
-      playsInline
-      poster={thumbnail}
-      src={sourceUrl}
-      fluid={true} // Use 100% width of the container
-      aspectRatio={aspectRatio}
-      // ⚠️ CRITICAL FIX 1: Cast to any to bypass the TypeScript error about 'children' prop on Player
-      {...({} as any)}
-    >
-      {/* 4. Subtitle Track: It must be here for the useEffect to find it */}
-      {/* The `src` is empty and will be filled by the useEffect hook with the blob URL. */}
-      <track kind="captions" label={videoName} src="" default={true} />
-
-      {/* 5. Custom Control Bar. This is where controls are configured in video-react. */}
-      <BigPlayButton position="center" />
-      <ControlBar
-        // ⚠️ CRITICAL FIX 2: Cast to any to bypass the TypeScript error about 'children' prop on ControlBar
-        {...({} as any)}
-      >
-        {/* PlaybackRateMenuButton allows speed control, similar to one of the custom Plyr controls */}
-        <VolumeMenuButton vertical />
-        <PlaybackRateMenuButton rates={[2, 1.5, 1.25, 1, 0.75, 0.5]} />
-      </ControlBar>
-    </Player>
-  )
+  // Common plyr configs, including the video source and plyr options
+  const plyrSource = {
+    type: 'video',
+    title: videoName,
+    poster: thumbnail,
+    tracks: [{ kind: 'captions', label: videoName, src: '', default: true }],
+  }
+  const plyrOptions: Plyr.Options = {
+    ratio: `${width ?? 16}:${height ?? 9}`,
+    fullscreen: { iosNative: true },
+    // -------------------------------------------------------------
+    // MODIFICATION START: Add controls array with 'fast-forward'
+    // -------------------------------------------------------------
+    controls: [
+      'rewind',       // Rewind button (typically skips back 10 seconds)
+      'play',
+      'fast-forward', // Fast Forward button (typically skips forward 10 seconds)
+      'progress',
+      'current-time',
+      'duration',
+      'mute',
+      'volume',
+      'captions',
+      'settings',
+      'fullscreen',
+    ],
+    // -------------------------------------------------------------
+    // MODIFICATION END
+    // -------------------------------------------------------------
+  }
+  if (!isFlv) {
+    // If the video is not in flv format, we can use the native plyr and add sources directly with the video URL
+    plyrSource['sources'] = [{ src: videoUrl }]
+  }
+  return <Plyr id="plyr" source={plyrSource as Plyr.SourceInfo} options={plyrOptions} />
 }
-
-// -------------------------------------------------------------
-// MODIFICATION END
-// -------------------------------------------------------------
 
 const VideoPreview: FC<{ file: OdFileObject }> = ({ file }) => {
   const { asPath } = useRouter()
