@@ -92,7 +92,7 @@ const VideoPlayer: FC<{
       src={sourceUrl}
       fluid={true} // Use 100% width of the container
       aspectRatio={aspectRatio}
-      // ⚠️ CRITICAL FIX: Cast to any to bypass the TypeScript error about 'children' prop
+      // ⚠️ CRITICAL FIX 1: Cast to any to bypass the TypeScript error about 'children' prop on Player
       {...({} as any)}
     >
       {/* 4. Subtitle Track: It must be here for the useEffect to find it */}
@@ -101,14 +101,14 @@ const VideoPlayer: FC<{
 
       {/* 5. Custom Control Bar. This is where controls are configured in video-react. */}
       <BigPlayButton position="center" />
-      <ControlBar>
+      <ControlBar
+        // ⚠️ CRITICAL FIX 2: Cast to any to bypass the TypeScript error about 'children' prop on ControlBar
+        {...({} as any)}
+      >
         {/* PlaybackRateMenuButton allows speed control, similar to one of the custom Plyr controls */}
         <VolumeMenuButton vertical />
         <PlaybackRateMenuButton rates={[2, 1.5, 1.25, 1, 0.75, 0.5]} />
       </ControlBar>
-
-      {/* For true multi-audio support, further configuration (HLS/DASH manifest + plugin) 
-          would be needed outside of this file's current scope. */}
     </Player>
   )
 }
